@@ -1,0 +1,41 @@
+(a|b)*(b|a)*abb
+
+    bbabb
+    babb
+    aaaaaaaaaabbbbbbabababababababababababababbb
+    abb
+
+
+((ε|a)b*)*
+
+    ε
+    0 //vacio
+    a
+    aba
+    abba
+
+
+(.|;)*-/.(.|;)*
+
+    .;-/.
+    -/..;
+    -/.
+    ;;;;;;;......;.;.;.;.;.;.;./.;.;.;.;.;
+
+
+(x|t)+((a|m)?)+ 
+
+    x
+    txm
+    ma
+    a
+
+
+("(.(;(.;(.|;)+)*)*)*)
+
+    ".;.;.
+    ".;.;;.
+    ".;.;
+    ε
+    0 //vacio
+    ".;;.
