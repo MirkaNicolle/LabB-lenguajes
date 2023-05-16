@@ -10,6 +10,7 @@ Laboratorio B
 
 import tkinter as tk
 import re
+import graphviz
 
 '''
 Laboratorio B 
@@ -26,16 +27,23 @@ def ingresar():
     valida = verificar_validez(r)
     pertenece = verificar_pertenece(r, w)
 
-    #casos variados de verifiacion 
+    #casos de verifiacion 
     if balanceada and valida and pertenece: #si esta balanceada y es valida la cadena c
         output.delete(1.0, tk.END)
         output.insert(tk.END, "Sí")
+
+        notacion_postfix = infix_to_postfix(r) #funcion de conversion
+        print("Notación postfix:", notacion_postfix)
+
     elif not balanceada : #en caso de no estar balanceada
         output.delete(1.0, tk.END)
         output.insert(tk.END, "r no está balanceada")
     else:
         output.delete(1.0, tk.END) #otro caso
         output.insert(tk.END, "No")
+
+        notacion_postfix = infix_to_postfix(r) #funcion de conversion
+        print("Notación postfix:", notacion_postfix)
 
 def verificar_balance(r):
     stack = []
@@ -64,7 +72,6 @@ def verificar_pertenece(r, w):
     #en caso de vacio
     if not w: 
         return False
-
     
     #match con patron
     pattern = r'^' + r + r'$'
@@ -73,44 +80,236 @@ def verificar_pertenece(r, w):
 #conversión de una expresión regular en notación infix a notación postfix basado en algoritmo Shunting Yard
 def infix_to_postfix(r):
     r = entry_r.get()
-    #postfix_r = infix_to_postfix(r)
 
     pred = {'(': 1, '|': 2, '.': 3, '?': 4, '*': 4, '+': 4, '^': 5, '/': 6, '-': 6}
-    output = []
+    postfix = []
     stack = []
 
     for char in r:
-        if char.isalpha():
-            output.append(char)
+        if char.isalpha() or char in ('.', ';', '"'):
+            postfix.append(char)
         elif char == '(':
             stack.append(char)
         elif char == ')':
             while stack and stack[-1] != '(':
-                output.append(stack.pop())
+                postfix.append(stack.pop())
             stack.pop() 
         else:  
             while stack and pred.get(char, 0) <= pred.get(stack[-1], 0):
-                output.append(stack.pop())
+                postfix.append(stack.pop())
             stack.append(char)
 
     while stack:
-        output.append(stack.pop())
+        [postfix].append(stack.pop())
 
-    expresion_postfix = ''.join(output)
-    return expresion_postfix
+    return ''.join(postfix)
 
-def afn_afd():
+def afn_afd(notacion_postfix):
+    stack = []
+
+    for char in notacion_postfix:
+        if char.isalnum():
+            # Crear un nuevo nodo para el símbolo alfanumérico
+            stack.append({'label': char, 'edges': []})
+        elif char == '.':
+            # Concatenar dos últimos nodos de la pila
+            if len(stack) >= 2:
+                node2 = stack.pop()
+                node1 = stack.pop()
+                new_node = {'label': 'ε', 'edges': [(node1, ''), (node2, '')]}
+                stack.append(new_node)
+        elif char == '+':
+            # Unir dos últimos nodos de la pila
+            if len(stack) >= 2:
+                node2 = stack.pop()
+                node1 = stack.pop()
+                new_node = {'label': 'ε', 'edges': [(node1, ''), (node2, '')]}
+                stack.append(new_node)
+        elif char == '*':
+            # Crear un nuevo nodo para la clausura de Kleene
+            if stack:
+                node = stack.pop()
+                new_node = {'label': 'ε', 'edges': [(node, ''), (new_node, '')]}
+                stack.append(new_node)
+
+    if stack:
+        start_node = stack[0]
+        final_node = stack[-1]
+        
+        # Generar el diagrama utilizando graphviz
+        g = graphviz.Digraph(format='png')
+        g.attr(rankdir='LR')
+        g.attr('node', shape='doublecircle')
+        g.node(final_node['label'])
+        g.attr('node', shape='circle')
+        g.attr('edge', arrowhead='empty')
+        g.attr('edge', fontsize='10')
+
+        visited = set()
+
+        def generate_graph(node):
+            if node not in visited:
+                visited.add(node)
+                for edge in node['edges']:
+                    next_node, label = edge
+                    g.edge(node['label'], next_node['label'], label=label)
+                    generate_graph(next_node)
+
+        generate_graph(start_node)
+        g.render('afn', view=True)
+    else:
+        print("No se pudo completar el diagrama del AFN-AFD.")
+
+def afd_directo(notacion_postfix):
+    stack = []
+    alphabet = set()
+    states = []
+    transitions = []
+
+    for char in notacion_postfix:
+        if char.isalnum():
+            # Crear un nuevo estado para el símbolo alfanumérico
+            stack.append(char)
+            alphabet.add(char)
+        elif char == '.':
+            # Concatenar dos últimos estados de la pila
+            if len(stack) >= 2:
+                state2 = stack.pop()
+                state1 = stack.pop()
+                new_state = state1 + state2
+                stack.append(new_state)
+        elif char == '+':
+            # Unir dos últimos estados de la pila
+            if len(stack) >= 2:
+                state2 = stack.pop()
+                state1 = stack.pop()
+                new_state = state1 + state2
+                stack.append(new_state)
+        elif char == '*':
+            # Crear un nuevo estado para la clausura de Kleene
+            if stack:
+                state = stack.pop()
+                new_state = state + "*"
+                stack.append(new_state)
+
+    if stack:
+        start_state = stack[0]
+        final_state = stack[-1]
+        states = list(stack)
+
+        # Generar las transiciones del AFD
+        for state in states:
+            for symbol in alphabet:
+                if symbol in state:
+                    if symbol.isalnum():
+                        next_state = state.replace(symbol, "")
+                        transitions.append((state, symbol, next_state))
+
+        # Generar el diagrama utilizando graphviz
+        g = graphviz.Digraph(format='png')
+        g.attr(rankdir='LR')
+        g.attr('node', shape='doublecircle')
+        g.node(final_state)
+        g.attr('node', shape='circle')
+        g.attr('edge', arrowhead='empty')
+        g.attr('edge', fontsize='10')
+
+        for state in states:
+            g.node(state)
+
+        for transition in transitions:
+            current_state, symbol, next_state = transition
+            g.edge(current_state, next_state, label=symbol)
+
+        g.render('afd', view=True)
+    else:
+        print("No se pudo completar el diagrama del AFD directo.")
+
+def afd_subconjuntos(notacion_postfix):
+    stack = []
+    alphabet = set()
+    states = []
+    transitions = []
+
+    for char in notacion_postfix:
+        if char.isalnum():
+            # Crear un nuevo estado para el símbolo alfanumérico
+            stack.append({char})
+            alphabet.add(char)
+        elif char == '.':
+            # Concatenar dos últimos estados de la pila
+            if len(stack) >= 2:
+                state2 = stack.pop()
+                state1 = stack.pop()
+                new_state = state1.union(state2)
+                stack.append(new_state)
+        elif char == '+':
+            # Unir dos últimos estados de la pila
+            if len(stack) >= 2:
+                state2 = stack.pop()
+                state1 = stack.pop()
+                new_state = state1.union(state2)
+                stack.append(new_state)
+        elif char == '*':
+            # Crear un nuevo estado para la clausura de Kleene
+            if stack:
+                state = stack.pop()
+                new_state = state.copy()
+                new_state.add('')
+                stack.append(new_state)
+
+    if stack:
+        start_state = stack[0]
+        final_state = stack[-1]
+        states = list(stack)
+
+        # Generar las transiciones del AFD utilizando el método de subconjuntos
+        visited = set()
+        unvisited = [start_state]
+        
+        while unvisited:
+            current_state = unvisited.pop()
+            visited.add(current_state)
+            
+            for symbol in alphabet:
+                next_state = set()
+                for state in current_state:
+                    if state == '':
+                        continue
+                    if symbol in state:
+                        next_state.add(state.replace(symbol, ''))
+                
+                if next_state and next_state not in visited:
+                    unvisited.append(next_state)
+                    transitions.append((current_state, symbol, next_state))
+
+        # Generar el diagrama utilizando graphviz
+        g = graphviz.Digraph(format='png')
+        g.attr(rankdir='LR')
+        g.attr('node', shape='doublecircle')
+        g.node(final_state)
+        g.attr('node', shape='circle')
+        g.attr('edge', arrowhead='empty')
+        g.attr('edge', fontsize='10')
+
+        for state in states:
+            state_label = ','.join(sorted(state, key=lambda x: (len(x), x)))
+            g.node(state_label)
+            if final_state.issubset(state):
+                g.edge(state_label, final_state, label='ε')
+
+        for transition in transitions:
+            current_state, symbol, next_state = transition
+            current_state_label = ','.join(sorted(current_state, key=lambda x: (len(x), x)))
+            next_state_label = ','.join(sorted(next_state, key=lambda x: (len(x), x)))
+            g.edge(current_state_label, next_state_label, label=symbol)
+
+        g.render('afd_subconjuntos', view=True)
+    else:
+        print("No se pudo completar el diagrama del AFD por subconjuntos.")
+
+def afd_minimizacion(notacion_postfix):
     pass
-
-def afd_directo():
-    pass
-
-def afd_subconjuntos():
-    pass
-
-def afd_minimizacion():
-    pass
-
 
 
 
