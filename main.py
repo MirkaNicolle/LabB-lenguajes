@@ -12,6 +12,8 @@ import tkinter as tk
 import re
 import graphviz
 
+notacion_postfix = ''
+
 '''
 Laboratorio B 
 Construccion de un AFN (NFA), el cual deberá transformar posteriormente a un AFD (DFA); además, 
@@ -33,7 +35,7 @@ def ingresar():
         output.insert(tk.END, "Sí")
 
         notacion_postfix = infix_to_postfix(r) #funcion de conversion
-        print("Notación postfix:", notacion_postfix)
+        print ("Notación postfix:", notacion_postfix)
 
     elif not balanceada : #en caso de no estar balanceada
         output.delete(1.0, tk.END)
@@ -161,11 +163,13 @@ def afn_afd(notacion_postfix):
         print("No se pudo completar el diagrama del AFN-AFD.")
 
 def afd_directo(notacion_postfix):
+    r = entry_r.get()
     stack = []
     alphabet = set()
     states = []
     transitions = []
-
+    notacion_postfix = infix_to_postfix(r)
+    
     for char in notacion_postfix:
         if char.isalnum():
             # Crear un nuevo estado para el símbolo alfanumérico
